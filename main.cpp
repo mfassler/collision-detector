@@ -10,17 +10,18 @@
 
 #include <stdio.h>
 #include <sys/time.h>
+#include <unistd.h>
 
-#include "librealsense2/rs.hpp"
+#include <thread>
+#include <mutex>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
-extern "C" {
-#include <darknet.h>
-}
+#include <librealsense2/rs.hpp>
 
+#include "Darknet.hpp"
 
 
 using namespace std;
@@ -30,6 +31,45 @@ using namespace std;
 const char* nn_cfgfile = "darknet/cfg/yolov3-tiny.cfg";
 const char* nn_weightfile = "darknet/yolov3-tiny.weights";
 const char* nn_meta_file = "darknet/cfg/coco.data";
+
+
+double gettimeofday_as_double() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    double ts = tv.tv_sec + (tv.tv_usec / 1000000.0);
+
+    return ts;
+}
+
+
+
+int nboxes;
+detection* dets;
+std::mutex mtx_a;
+
+void worker_thread(Darknet mDarknet) {
+	int _nboxes = 0;
+	detection* _dets;
+
+	//double ts0, ts1, deltaT;
+	//ts0 = gettimeofday_as_double();
+
+	while (true) {
+		_dets = mDarknet.detect_scale(&_nboxes);
+
+		mtx_a.lock();
+		free_detections(dets, nboxes);
+		nboxes = _nboxes;
+		dets = _dets;
+		mtx_a.unlock();
+
+		//ts1 = gettimeofday_as_double();
+		//deltaT = ts1 - ts0;
+		//ts0 = ts1;
+		//printf("NN FPS: %.03f\n", 1.0/deltaT);
+	}
+}
 
 
 int main(int argc, char* argv[]) {
@@ -84,20 +124,17 @@ int main(int argc, char* argv[]) {
 	// ---------------------------------------------------------
 	//  BEGIN:  Start Darknet
 	// ---------------------------------------------------------
-	network *dn_net = load_network((char*)nn_cfgfile, (char*)nn_weightfile, 0);
+	Darknet mDarknet(nn_cfgfile, nn_weightfile, nn_meta_file, _RGB_WIDTH, _RGB_HEIGHT, 3);
 
-	// TODO:  what does this do?
-	set_batch_network(dn_net, 1);
-	srand(2222222);
-
-	metadata dn_meta = get_metadata((char*)nn_meta_file);
+	// Run darknet in a different thread, because it is a bit slower than the framerate:
+	std::thread worker(worker_thread, mDarknet);
 
 	// ---------------------------------------------------------
 	//  END:  Start Darknet
 	// ---------------------------------------------------------
 
 
-	//cv::namedWindow("RealSense", cv::WINDOW_NORMAL);
+	cv::namedWindow("RealSense", cv::WINDOW_NORMAL);
 
 	while (true) {
 
@@ -109,44 +146,15 @@ int main(int argc, char* argv[]) {
 		//double frame_ts = vid_frame.get_timestamp();
 
 		auto raw_rgb_data = vid_frame.get_data();
-
-
-		// -----------------------------------------------------------------
-		// We have to copy the RGB frame into Darknet-land for NN detection:
-		image dn_image = make_image(_RGB_WIDTH, _RGB_HEIGHT, 3);
-		int h = _RGB_HEIGHT;
-		int w = _RGB_WIDTH;
-		int c = 3;
-		int step_h = w*c;
-		int step_w = c;
-		int step_c = 1;
-
-		int i, j, k;
-		int index1, index2;
-
-		for (i=0; i<h; ++i) {
-			for (k=0; k<c; ++k) {
-				for (j=0; j<w; ++j) {
-
-					index1 = k*w*h + i*w + j;
-					index2 = step_h*i + step_w*j + step_c*k;
-
-					dn_image.data[index1] = ((unsigned char*)raw_rgb_data)[index2]/255.;
-				}
-			}
-		}
-
-
-		// ------------------------------------------------------------
-		// We have to copy the RGB frame into OpenCV-land for display:
-		cv::Mat imRGB(cv::Size(vid_frame.get_width(), vid_frame.get_height()), CV_8UC3, (void*)raw_rgb_data, cv::Mat::AUTO_STEP);
+		// Copy the Realsense frames into OpenCV-land:
 		cv::Mat imD(cv::Size(dep_frame.get_width(), dep_frame.get_height()), CV_16UC1, (void*)dep_frame.get_data(), cv::Mat::AUTO_STEP);
+		cv::Mat imRGB(cv::Size(vid_frame.get_width(), vid_frame.get_height()), CV_8UC3, (void*)raw_rgb_data, cv::Mat::AUTO_STEP);
 
-		cv::Vec3b px_red = cv::Vec3b(0, 0, 255);
-		cv::Vec3b px_yellow = cv::Vec3b(0, 255, 255);
+		// copy the input RGB into Darknet:
+		mDarknet.load_image(imRGB);
 
-		for (i=0; i<imD.rows; ++i) {
-			for (j=0; j<imD.cols; ++j) {
+		for (int i=0; i<imD.rows; ++i) {
+			for (int j=0; j<imD.cols; ++j) {
 				// A little counter-intuitive, but:
 				// The depth image has "shadows".  The Intel librealsense2 driver interprets
 				// shadows as distance == 0.  But we will change that to distance=max, so that
@@ -166,26 +174,30 @@ int main(int argc, char* argv[]) {
 		int all_depth_min = 200000;  // in integer depth_scale units
 
 
-		// ------------------------------------------------------------
-		//    BEGIN:  Neural-network people-detector
-		// ------------------------------------------------------------
-		// We have to copy the RGB frame into OpenCV-land for display:
-		// Python version doesn't use this?
-		//image sized = letterbox_image(dn_image, dn_net->w, dn_net->h);
-		// float *X = sized.data;
-		// network_predict(net, X);
+		struct _bbox bboxes_a[25];
+		int i, j;
 
-		float thresh = 0.5;
-		float hier_thresh = 0.5;
-		float nms = 0.45;
+		// Copy the bounding boxes provided from the neural-network
+		mtx_a.lock();
+		int count = 0;
+		for (i=0; i<nboxes; ++i) {
+			if (count > 24) {
+				break;
+			}
+			//for (j=0; j<dn_meta.classes; ++j) {
+			j = 0;  // class #0 is "person", the only category we care about
+			if (dets[i].prob[j] > 0.2) {
+				bboxes_a[count].x = (dets[i]).bbox.x;
+				bboxes_a[count].y = (dets[i]).bbox.y;
+				bboxes_a[count].w = (dets[i]).bbox.w;
+				bboxes_a[count].h = (dets[i]).bbox.h;
+				count++;
+			}
 
-		network_predict_image(dn_net, dn_image);
-		int nboxes = 0;
-		detection *dets = get_network_boxes(dn_net, dn_image.w, dn_image.h, thresh, hier_thresh, 0, 1, &nboxes);
-
-		if (nms) {
-			do_nms_obj(dets, nboxes, dn_meta.classes, nms);
+			//}
 		}
+		mtx_a.unlock();
+
 
 		float half_w = _RGB_WIDTH / 2.0;
 		float half_h = _RGB_HEIGHT / 2.0;
@@ -195,14 +207,14 @@ int main(int argc, char* argv[]) {
 			j = 0;  // class #0 is "person", the only category we care about
 				if (dets[i].prob[j] > 0.0) {
 
-					float x_center = dets[i].bbox.x * _RGB_WIDTH;
-					float y_center = dets[i].bbox.y * _RGB_HEIGHT;
-					float width = dets[i].bbox.w * _RGB_WIDTH;
-					float height = dets[i].bbox.h * _RGB_HEIGHT;
+					float x_center = bboxes_a[i].x * _RGB_WIDTH;
+					float y_center = bboxes_a[i].y * _RGB_HEIGHT;
+					float width = bboxes_a[i].w * _RGB_WIDTH;
+					float height = bboxes_a[i].h * _RGB_HEIGHT;
 
-					int x_min = (int) (x_center - dets[i].bbox.w * half_w);
+					int x_min = (int) (x_center - bboxes_a[i].w * half_w);
 					int x_max = (int) (x_min + width);
-					int y_min = (int) (y_center - dets[i].bbox.h * half_h);
+					int y_min = (int) (y_center - bboxes_a[i].h * half_h);
 					int y_max = (int) (y_min + height);
 
 					if (x_min < 0) {
@@ -246,8 +258,6 @@ int main(int argc, char* argv[]) {
 			//}
 		}
 
-		free_image(dn_image);
-		free_detections(dets, nboxes);
 
 		float closest = all_depth_min * depth_scale;
 		if (closest < _MAX_DISPLAY_DISTANCE_IN_METERS) {
@@ -258,7 +268,7 @@ int main(int argc, char* argv[]) {
 			cv::putText(imRGB, textBuffer, cv::Point(10,110), font, 4, cv::Scalar(255,255,255), 8);  // white text
 		}
 
-		//cv::setWindowProperty("RealSense", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
+		cv::setWindowProperty("RealSense", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
 		cv::imshow("RealSense", imRGB);
 		cv::waitKey(1);
 
