@@ -1,3 +1,7 @@
+## Build Options:
+NETWORK_DISPLAY = 0
+LOCAL_DISPLAY = 1
+
 ######
 ######   What are we building?
 ######
@@ -15,6 +19,15 @@ OBJECTS += Darknet.o
 ######
 
 CPPFLAGS = -std=c++11
+ifeq ($(LOCAL_DISPLAY), 1)
+CPPFLAGS += -DUSE_LOCAL_DISPLAY
+endif
+
+ifeq ($(NETWORK_DISPLAY), 1)
+CPPFLAGS += -DUSE_NETWORK_DISPLAY
+OBJECTS += UdpSender.o
+endif
+
 CPPFLAGS += -O3
 #CPPFLAGS += -g
 

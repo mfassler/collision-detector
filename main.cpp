@@ -23,6 +23,9 @@
 
 #include "Darknet.hpp"
 
+#ifdef USE_NETWORK_DISPLAY
+#include "UdpSender.hpp"
+#endif // USE_NETWORK_DISPLAY
 
 using namespace std;
 
@@ -84,6 +87,14 @@ int main(int argc, char* argv[]) {
 	float _MAX_DISPLAY_DISTANCE_IN_METERS = 3.0;
 	float _YELLOW_DISTANCE_IN_METERS = 2.0;
 	float _RED_DISTANCE_IN_METERS = 1.0;
+
+#ifdef USE_NETWORK_DISPLAY
+	const char* ServerAddress = "192.168.11.36";
+	const uint16_t DataRxPort = 3101;
+	const uint16_t ImageRxPort = 3201;
+
+	UdpSender udpSender(ServerAddress, DataRxPort, ImageRxPort);
+#endif //USE_NETWORK_DISPLAY
 
 	// TODO:
 	// if (config_file) {
@@ -202,6 +213,18 @@ int main(int argc, char* argv[]) {
 		float half_w = _RGB_WIDTH / 2.0;
 		float half_h = _RGB_HEIGHT / 2.0;
 
+
+#ifdef USE_NETWORK_DISPLAY
+		// Send all the bounding boxes and distances to the display server:
+		unsigned char metaDataBuffer[1500];  // MTU of ethernet
+
+		struct bbox_packet *bbox_packets;
+		bbox_packets = (struct bbox_packet*) &(metaDataBuffer[4]);
+
+		int pkt_number = 0;
+
+#endif // USE_NETWORK_DISPLAY
+
 		for (i=0; i<nboxes; ++i) {
 			//for (j=0; j<dn_meta.classes; ++j) {
 			j = 0;  // class #0 is "person", the only category we care about
@@ -243,6 +266,18 @@ int main(int argc, char* argv[]) {
 							}
 						}
 					}
+
+#ifdef USE_NETWORK_DISPLAY
+					bbox_packets[pkt_number].min_distance = depth_min * depth_scale;
+					bbox_packets[pkt_number].x_min = x_min;
+					bbox_packets[pkt_number].x_max = x_max;
+					bbox_packets[pkt_number].y_min = y_min;
+					bbox_packets[pkt_number].y_max = y_max;
+					pkt_number++;
+
+#endif // USE_NETWORK_DISPLAY
+
+#ifdef USE_LOCAL_DISPLAY
 					if (depth_min < all_depth_min) {
 						all_depth_min = depth_min;
 					}
@@ -254,11 +289,26 @@ int main(int argc, char* argv[]) {
 					} else if (depth_min < YELLOW_DISTANCE) {
 						cv::rectangle(imRGB, r, cv::Scalar(0,230,230), 9);
 					}
+#endif // USE_LOCAL_DISPLAY
 				}
 			//}
 		}
 
 
+#ifdef USE_NETWORK_DISPLAY
+		// waste 3 bytes to maintain 32-bit boundaries:
+		metaDataBuffer[0] = 0;
+		metaDataBuffer[1] = 0;
+		metaDataBuffer[2] = 0;
+		metaDataBuffer[3] = (unsigned char) pkt_number;
+
+		int dataSize = 4 + sizeof(struct bbox_packet) * pkt_number;
+		udpSender.sendData(metaDataBuffer, dataSize);
+		udpSender.sendImage(imRGB);
+#endif // USE_NETWORK_DISPLAY
+
+
+#ifdef USE_LOCAL_DISPLAY
 		float closest = all_depth_min * depth_scale;
 		if (closest < _MAX_DISPLAY_DISTANCE_IN_METERS) {
 			char textBuffer[255];
@@ -271,6 +321,7 @@ int main(int argc, char* argv[]) {
 		cv::setWindowProperty("RealSense", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
 		cv::imshow("RealSense", imRGB);
 		cv::waitKey(1);
+#endif // USE_LOCAL_DISPLAY
 
 		//gettimeofday(&tv, NULL);
 		//printf("ts: %ld.%06ld\n", tv.tv_sec, tv.tv_usec);
