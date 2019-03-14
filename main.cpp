@@ -78,11 +78,11 @@ void worker_thread(Darknet mDarknet) {
 int main(int argc, char* argv[]) {
 
 	struct timeval tv;
-	int _DEPTH_WIDTH = 640;
-	int _DEPTH_HEIGHT = 360;
+	int _DEPTH_WIDTH = 848;
+	int _DEPTH_HEIGHT = 480;
 	int _FPS = 30;
-	int _RGB_WIDTH = 1280;
-	int _RGB_HEIGHT = 720;
+	int _RGB_WIDTH = 848;
+	int _RGB_HEIGHT = 480;
 
 	float _MAX_DISPLAY_DISTANCE_IN_METERS = 3.0;
 	float _YELLOW_DISTANCE_IN_METERS = 2.0;

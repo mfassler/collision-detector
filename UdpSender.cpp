@@ -44,7 +44,7 @@ void UdpSender::sendImage(cv::Mat image) {
 	#define STOP_MAGIC_LEN 9
 
 	std::vector<uchar> outputBuffer;
-	std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 30};
+	std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 42};
 
 	if (!cv::imencode("*.jpg", image, outputBuffer, params)) {
 		printf("failed to imencode\n");
