@@ -75,7 +75,7 @@ def showImage():
         cv2.putText(im, text, (19,119), font, 4, (0,0,0), 8)  # black shadow
         cv2.putText(im, text, (10,110), font, 4, (255,255,255), 8)  # white text
 
-    cv2.setWindowProperty('RealSense', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    #cv2.setWindowProperty('RealSense', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow('RealSense', im)
     cv2.waitKey(1)
 
@@ -131,12 +131,15 @@ while True:
             data, addr = data_sock.recvfrom(65535)
             if addr[0] not in rx_data:
                 rx_data[addr[0]] = {
+                    'remote_id': 0,
                     'nboxes': 0,
                     'distances': np.empty(16, np.float),
                     'bboxes': np.empty((16, 4), np.int32),
                     'ts': time.time()
                 }
             #print(addr[0])
+            rx_data[addr[0]]['remote_id'] = data[2]
+            print('remote_id:', rx_data[addr[0]]['remote_id'])
             rx_data[addr[0]]['nboxes'] = data[3]
             rx_data[addr[0]]['ts'] = time.time()
             for i in range(rx_data[addr[0]]['nboxes']):

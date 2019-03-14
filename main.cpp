@@ -89,7 +89,22 @@ int main(int argc, char* argv[]) {
 	float _RED_DISTANCE_IN_METERS = 1.0;
 
 #ifdef USE_NETWORK_DISPLAY
-	const char* ServerAddress = "192.168.11.36";
+	int local_id = 0;
+	if (argc < 2) {
+		printf("Usage:  %s server_ip_address [local_id]\n", argv[0]);
+		return -1;
+	}
+	if (argc > 2) {
+		local_id = atoi(argv[2]);
+		if (local_id < 0) {
+			local_id = 0;
+		} else if (local_id > 255) {
+			local_id = 0;
+		}
+	}
+	printf("local_id: %d\n", local_id);
+
+	const char* ServerAddress = argv[1];
 	const uint16_t DataRxPort = 3101;
 	const uint16_t ImageRxPort = 3201;
 
@@ -144,8 +159,9 @@ int main(int argc, char* argv[]) {
 	//  END:  Start Darknet
 	// ---------------------------------------------------------
 
-
+#ifdef USE_LOCAL_DISPLAY
 	cv::namedWindow("RealSense", cv::WINDOW_NORMAL);
+#endif // USE_LOCAL_DISPLAY
 
 	while (true) {
 
@@ -296,10 +312,10 @@ int main(int argc, char* argv[]) {
 
 
 #ifdef USE_NETWORK_DISPLAY
-		// waste 3 bytes to maintain 32-bit boundaries:
+		// waste 2 bytes to maintain 32-bit boundaries:
 		metaDataBuffer[0] = 0;
 		metaDataBuffer[1] = 0;
-		metaDataBuffer[2] = 0;
+		metaDataBuffer[2] = local_id;
 		metaDataBuffer[3] = (unsigned char) pkt_number;
 
 		int dataSize = 4 + sizeof(struct bbox_packet) * pkt_number;
