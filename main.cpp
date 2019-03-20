@@ -241,73 +241,68 @@ int main(int argc, char* argv[]) {
 
 #endif // USE_NETWORK_DISPLAY
 
-		for (i=0; i<nboxes; ++i) {
-			//for (j=0; j<dn_meta.classes; ++j) {
-			j = 0;  // class #0 is "person", the only category we care about
-				if (dets[i].prob[j] > 0.0) {
+		for (i=0; i<count; ++i) {
 
-					float x_center = bboxes_a[i].x * _RGB_WIDTH;
-					float y_center = bboxes_a[i].y * _RGB_HEIGHT;
-					float width = bboxes_a[i].w * _RGB_WIDTH;
-					float height = bboxes_a[i].h * _RGB_HEIGHT;
+			float x_center = bboxes_a[i].x * _RGB_WIDTH;
+			float y_center = bboxes_a[i].y * _RGB_HEIGHT;
+			float width = bboxes_a[i].w * _RGB_WIDTH;
+			float height = bboxes_a[i].h * _RGB_HEIGHT;
 
-					int x_min = (int) (x_center - bboxes_a[i].w * half_w);
-					int x_max = (int) (x_min + width);
-					int y_min = (int) (y_center - bboxes_a[i].h * half_h);
-					int y_max = (int) (y_min + height);
+			int x_min = (int) (x_center - bboxes_a[i].w * half_w);
+			int x_max = (int) (x_min + width);
+			int y_min = (int) (y_center - bboxes_a[i].h * half_h);
+			int y_max = (int) (y_min + height);
 
-					if (x_min < 0) {
-						x_min = 0;
-					}
-					if (x_max >= _RGB_WIDTH) {
-						x_max = _RGB_WIDTH - 1;
-					}
-					if (y_min < 0) {
-						y_min = 0;
-					}
-					if (y_max >= _RGB_HEIGHT) {
-						y_max = _RGB_HEIGHT - 1;
-					}
+			if (x_min < 0) {
+				x_min = 0;
+			}
+			if (x_max >= _RGB_WIDTH) {
+				x_max = _RGB_WIDTH - 1;
+			}
+			if (y_min < 0) {
+				y_min = 0;
+			}
+			if (y_max >= _RGB_HEIGHT) {
+				y_max = _RGB_HEIGHT - 1;
+			}
 
-					// Find the closest point within this box:
-					bbox_x_min = 20000;
-					bbox_x_max = 0;
-					bbox_y_min = 20000;
-					bbox_y_max = 0;
-					depth_min = 200000;  // in integer depth_scale units
-					for (int ii=y_min; ii<y_max; ++ii) {
-						for (int jj=x_min; jj<x_max; ++jj) {
-							if (imD.at<uint16_t>(ii, jj) < depth_min) {
-								depth_min = imD.at<uint16_t>(ii, jj);
-							}
-						}
+			// Find the closest point within this box:
+			bbox_x_min = 20000;
+			bbox_x_max = 0;
+			bbox_y_min = 20000;
+			bbox_y_max = 0;
+			depth_min = 200000;  // in integer depth_scale units
+			for (int ii=y_min; ii<y_max; ++ii) {
+				for (int jj=x_min; jj<x_max; ++jj) {
+					if (imD.at<uint16_t>(ii, jj) < depth_min) {
+						depth_min = imD.at<uint16_t>(ii, jj);
 					}
+				}
+			}
 
 #ifdef USE_NETWORK_DISPLAY
-					bbox_packets[pkt_number].min_distance = depth_min * depth_scale;
-					bbox_packets[pkt_number].x_min = x_min;
-					bbox_packets[pkt_number].x_max = x_max;
-					bbox_packets[pkt_number].y_min = y_min;
-					bbox_packets[pkt_number].y_max = y_max;
-					pkt_number++;
+			bbox_packets[pkt_number].min_distance = depth_min * depth_scale;
+			bbox_packets[pkt_number].x_min = x_min;
+			bbox_packets[pkt_number].x_max = x_max;
+			bbox_packets[pkt_number].y_min = y_min;
+			bbox_packets[pkt_number].y_max = y_max;
+			pkt_number++;
 
 #endif // USE_NETWORK_DISPLAY
 
 #ifdef USE_LOCAL_DISPLAY
-					if (depth_min < all_depth_min) {
-						all_depth_min = depth_min;
-					}
+			if (depth_min < all_depth_min) {
+				all_depth_min = depth_min;
+			}
 
-					cv::Rect r = cv::Rect(x_min, y_min, width, height);
+			cv::Rect r = cv::Rect(x_min, y_min, width, height);
 
-					if (depth_min < RED_DISTANCE) {
-						cv::rectangle(imRGB, r, cv::Scalar(0,0,200), 11);
-					} else if (depth_min < YELLOW_DISTANCE) {
-						cv::rectangle(imRGB, r, cv::Scalar(0,230,230), 9);
-					}
+			if (depth_min < RED_DISTANCE) {
+				cv::rectangle(imRGB, r, cv::Scalar(0,0,200), 11);
+			} else if (depth_min < YELLOW_DISTANCE) {
+				cv::rectangle(imRGB, r, cv::Scalar(0,230,230), 9);
+			}
 #endif // USE_LOCAL_DISPLAY
-				}
-			//}
 		}
 
 
