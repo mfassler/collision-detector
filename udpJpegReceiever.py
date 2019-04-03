@@ -14,6 +14,12 @@ import cv2
 
 
 
+WRITE_VIDEO = False
+vid_out = None
+if WRITE_VIDEO:
+    vid_out = cv2.VideoWriter('cam_video.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (848, 480))
+
+
 START_MAGIC = b"__HylPnaJY_START_JPG "
 STOP_MAGIC = b"_g1nC_EOF"
 
@@ -33,6 +39,8 @@ WARN_DISTANCE = 4.0  # meters
 
 def showImage():
     global _last_stop_time
+    global WRITE_VIDEO
+    global vid_out
     closest_host_idx = -1
     closest_bbox_idx = -1
     closest_distance = 10000.00  # realsense can only go to ~10 meters.
@@ -68,6 +76,9 @@ def showImage():
         elif distances[i] < WARN_DISTANCE:
             cimg2 = cv2.rectangle(im, (bboxes[i][0], bboxes[i][2]), (bboxes[i][1], bboxes[i][3]),
                 (0,255,255), 4)
+        else:
+            cimg2 = cv2.rectangle(im, (bboxes[i][0], bboxes[i][2]), (bboxes[i][1], bboxes[i][3]),
+                (255,255,255), 3)
 
     font = cv2.FONT_HERSHEY_SIMPLEX
     if closest_distance < WARN_DISTANCE:
@@ -78,6 +89,11 @@ def showImage():
     #cv2.setWindowProperty('RealSense', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow('RealSense', im)
     cv2.waitKey(1)
+    if WRITE_VIDEO:
+        vid_out.write(im)
+
+
+
 
 
 cv2.namedWindow('RealSense', cv2.WINDOW_NORMAL)
