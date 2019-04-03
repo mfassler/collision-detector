@@ -37,12 +37,12 @@ const char* nn_meta_file = "darknet/cfg/coco.data";
 
 
 double gettimeofday_as_double() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
 
-    double ts = tv.tv_sec + (tv.tv_usec / 1000000.0);
+	double ts = tv.tv_sec + (tv.tv_usec / 1000000.0);
 
-    return ts;
+	return ts;
 }
 
 
@@ -318,6 +318,18 @@ int main(int argc, char* argv[]) {
 
 		udpSender._sendto(ServerAddress, DataRxPort, metaDataBuffer, dataSize);
 		//udpSender._sendto("127.0.0.1", DataRxPort, metaDataBuffer, dataSize);
+
+#ifdef USE_SCANLINE
+		// Get a scan of one row
+		const unsigned char *ptr;
+		unsigned char scanOut[ 848 * 2 ];  // will be larger than ethernet MTU  :-( ...
+		ptr = imD.ptr(240); // 240 is the middle row (the horizon, in theory)
+		for (int col=0; col < 848*2; ++col) {
+			scanOut[col] = ptr[col];
+		}
+		udpSender._sendto(ServerAddress, 3125, scanOut, 848*2);
+		//udpSender._sendto("127.0.0.1", 3125, scanOut, 848*2);
+#endif // USE_SCANLINE
 
 		udpSender.sendImage(imRGB);
 #endif // USE_NETWORK_DISPLAY
