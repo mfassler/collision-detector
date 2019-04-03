@@ -108,7 +108,8 @@ int main(int argc, char* argv[]) {
 	const uint16_t DataRxPort = 3101;
 	const uint16_t ImageRxPort = 3201;
 
-	UdpSender udpSender(ServerAddress, DataRxPort, ImageRxPort);
+	UdpSender udpSender(ServerAddress, ImageRxPort);
+
 #endif //USE_NETWORK_DISPLAY
 
 	// TODO:
@@ -314,7 +315,10 @@ int main(int argc, char* argv[]) {
 		metaDataBuffer[3] = (unsigned char) pkt_number;
 
 		int dataSize = 4 + sizeof(struct bbox_packet) * pkt_number;
-		udpSender.sendData(metaDataBuffer, dataSize);
+
+		udpSender._sendto(ServerAddress, DataRxPort, metaDataBuffer, dataSize);
+		//udpSender._sendto("127.0.0.1", DataRxPort, metaDataBuffer, dataSize);
+
 		udpSender.sendImage(imRGB);
 #endif // USE_NETWORK_DISPLAY
 

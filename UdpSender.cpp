@@ -7,21 +7,11 @@
 #include <opencv2/highgui.hpp>
 
 
-UdpSender::UdpSender(const char* ServerAddress, uint16_t dataRxPort, uint16_t imageRxPort) {
-	bzero((char*)&data_server, sizeof(data_server));
+UdpSender::UdpSender(const char* ServerAddress, uint16_t imageRxPort) {
 	bzero((char*)&image_server, sizeof(image_server));
-	data_server.sin_family = AF_INET;
 	image_server.sin_family = AF_INET;
-	data_server.sin_addr.s_addr = inet_addr(ServerAddress);
 	image_server.sin_addr.s_addr = inet_addr(ServerAddress);
-	data_server.sin_port = htons(dataRxPort);
 	image_server.sin_port = htons(imageRxPort);
-
-	data_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (data_sockfd < 0) {
-		fprintf(stderr, "Error opening socket");
-		//return EXIT_FAILURE;
-	}
 
 	image_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (image_sockfd < 0) {
@@ -32,9 +22,15 @@ UdpSender::UdpSender(const char* ServerAddress, uint16_t dataRxPort, uint16_t im
 
 
 
-void UdpSender::sendData(unsigned char *outBuffer, int bufLen) {
-	sendto(data_sockfd, outBuffer, bufLen, 0,
-	       (const struct sockaddr*)&data_server, sizeof(data_server));
+
+void UdpSender::_sendto(const char* host, uint16_t port, const void* buf, size_t len) {
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = inet_addr(host);
+	addr.sin_port = htons(port);
+
+	sendto(image_sockfd, buf, len, 0,
+	       (const struct sockaddr*)&addr, sizeof(addr));
 }
 
 

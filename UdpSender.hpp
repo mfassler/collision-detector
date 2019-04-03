@@ -18,14 +18,12 @@ struct bbox_packet {
 
 class UdpSender {
 private:
-	struct sockaddr_in data_server;
 	struct sockaddr_in image_server;
-	int data_sockfd;
 	int image_sockfd;
 
 public:
-	UdpSender(const char*, uint16_t, uint16_t);
-	void sendData(unsigned char*, int);
+	UdpSender(const char*, uint16_t);
+	void _sendto(const char* host, uint16_t port, const void* buf, size_t len);
 	void sendImage(cv::Mat);
 };
 
