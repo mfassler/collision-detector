@@ -142,6 +142,13 @@ int main(int argc, char* argv[]) {
 	int YELLOW_DISTANCE = (int) (_YELLOW_DISTANCE_IN_METERS / depth_scale);
 	int RED_DISTANCE = (int)  (_RED_DISTANCE_IN_METERS / depth_scale);
 
+	auto rgb_stream = profile.get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
+	const rs2_intrinsics rgb_intrinsics = rgb_stream.get_intrinsics();
+	printf("intrinsics: %d %d  %f %f %f %f\n", 
+		rgb_intrinsics.width, rgb_intrinsics.height,
+		rgb_intrinsics.ppx, rgb_intrinsics.ppy, rgb_intrinsics.fx, rgb_intrinsics.fy);
+
+
 	// ---------------------------------------------------------
 	//  END:  Start RealSense
 	// ---------------------------------------------------------
