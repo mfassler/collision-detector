@@ -29,6 +29,7 @@ OBJECTS += UdpSender.o
 endif
 
 CPPFLAGS += -O3
+CPPFLAGS += -I/usr/include/opencv4
 #CPPFLAGS += -g
 
 LD = g++
@@ -36,7 +37,7 @@ LD = g++
 #LDFLAGS = -L/usr/local/lib/
 LDFLAGS = -pthread
 LDLIBS += -lrealsense2
-LDLIBS += $(shell pkg-config --libs opencv)
+LDLIBS += $(shell pkg-config --libs opencv4)
 
 
 # Default target:
