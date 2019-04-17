@@ -21,7 +21,7 @@
 
 #include <librealsense2/rs.hpp>
 
-#include "Darknet.hpp"
+#include "CDNeuralNet.hpp"
 
 #ifdef USE_NETWORK_DISPLAY
 #include "UdpSender.hpp"
@@ -31,8 +31,8 @@ using namespace std;
 
 
 // The pre-trained neural-network for people detection:
-const char* nn_cfgfile = "darknet/cfg/yolov3-tiny.cfg";
 const char* nn_weightfile = "darknet/yolov3-tiny.weights";
+const char* nn_cfgfile = "darknet/cfg/yolov3-tiny.cfg";
 const char* nn_meta_file = "darknet/cfg/coco.data";
 
 
@@ -47,30 +47,16 @@ double gettimeofday_as_double() {
 
 
 
-int nboxes;
-detection* dets;
-std::mutex mtx_a;
+cv::Mat imRGB;
 
-void worker_thread(Darknet mDarknet) {
-	int _nboxes = 0;
-	detection* _dets;
 
-	//double ts0, ts1, deltaT;
-	//ts0 = gettimeofday_as_double();
-
+void worker_thread(CDNeuralNet _cdNet) {
 	while (true) {
-		_dets = mDarknet.detect_scale(&_nboxes);
-
-		mtx_a.lock();
-		free_detections(dets, nboxes);
-		nboxes = _nboxes;
-		dets = _dets;
-		mtx_a.unlock();
-
-		//ts1 = gettimeofday_as_double();
-		//deltaT = ts1 - ts0;
-		//ts0 = ts1;
-		//printf("NN FPS: %.03f\n", 1.0/deltaT);
+		if (imRGB.cols > 10) {
+			_cdNet.detect(imRGB);
+		} else {
+			usleep(5000);
+		}
 	}
 }
 
@@ -156,12 +142,15 @@ int main(int argc, char* argv[]) {
 
 
 	// ---------------------------------------------------------
-	//  BEGIN:  Start Darknet
+	//  BEGIN:  Start NN
 	// ---------------------------------------------------------
-	Darknet mDarknet(nn_cfgfile, nn_weightfile, nn_meta_file, _RGB_WIDTH, _RGB_HEIGHT, 3);
+	std::string modelPath = std::string(nn_weightfile);
+	std::string configPath = std::string(nn_cfgfile);
 
-	// Run darknet in a different thread, because it is a bit slower than the framerate:
-	std::thread worker(worker_thread, mDarknet);
+	CDNeuralNet cdNet(modelPath, configPath);
+
+	// Run the neural network in a different thread:
+	std::thread worker(worker_thread, cdNet);
 
 	// ---------------------------------------------------------
 	//  END:  Start Darknet
@@ -183,10 +172,8 @@ int main(int argc, char* argv[]) {
 		auto raw_rgb_data = vid_frame.get_data();
 		// Copy the Realsense frames into OpenCV-land:
 		cv::Mat imD(cv::Size(dep_frame.get_width(), dep_frame.get_height()), CV_16UC1, (void*)dep_frame.get_data(), cv::Mat::AUTO_STEP);
-		cv::Mat imRGB(cv::Size(vid_frame.get_width(), vid_frame.get_height()), CV_8UC3, (void*)raw_rgb_data, cv::Mat::AUTO_STEP);
+		imRGB = cv::Mat(cv::Size(vid_frame.get_width(), vid_frame.get_height()), CV_8UC3, (void*)raw_rgb_data, cv::Mat::AUTO_STEP);
 
-		// copy the input RGB into Darknet:
-		mDarknet.load_image(imRGB);
 
 		for (int i=0; i<imD.rows; ++i) {
 			for (int j=0; j<imD.cols; ++j) {
@@ -209,29 +196,11 @@ int main(int argc, char* argv[]) {
 		int all_depth_min = 200000;  // in integer depth_scale units
 
 
+		int nboxes_a;
 		struct _bbox bboxes_a[25];
-		int i, j;
 
 		// Copy the bounding boxes provided from the neural-network
-		mtx_a.lock();
-		int count = 0;
-		for (i=0; i<nboxes; ++i) {
-			if (count > 24) {
-				break;
-			}
-			//for (j=0; j<dn_meta.classes; ++j) {
-			j = 0;  // class #0 is "person", the only category we care about
-			if (dets[i].prob[j] > 0.2) {
-				bboxes_a[count].x = (dets[i]).bbox.x;
-				bboxes_a[count].y = (dets[i]).bbox.y;
-				bboxes_a[count].w = (dets[i]).bbox.w;
-				bboxes_a[count].h = (dets[i]).bbox.h;
-				count++;
-			}
-
-			//}
-		}
-		mtx_a.unlock();
+		nboxes_a = cdNet.get_output_boxes(bboxes_a, 25);
 
 
 		float half_w = _RGB_WIDTH / 2.0;
@@ -249,7 +218,7 @@ int main(int argc, char* argv[]) {
 
 #endif // USE_NETWORK_DISPLAY
 
-		for (i=0; i<count; ++i) {
+		for (int i=0; i<nboxes_a; ++i) {
 
 			float x_center = bboxes_a[i].x * _RGB_WIDTH;
 			float y_center = bboxes_a[i].y * _RGB_HEIGHT;

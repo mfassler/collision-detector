@@ -11,7 +11,6 @@ Using an RGB-D (depth) camera, detect people and measure the distance to them.  
 ## Software Requirements
 
 * librealsense (https://github.com/IntelRealSense/librealsense.git)
-* darknet (https://github.com/pjreddie/darknet.git)
-* OpenCV
+* OpenCV 4.1 with DNN module
 
 

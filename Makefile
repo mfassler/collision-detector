@@ -12,7 +12,7 @@ TARGET = alertIfTooClose
 # Objects that must be built in order to link
 
 OBJECTS = main.o
-OBJECTS += Darknet.o
+OBJECTS += CDNeuralNet.o
 
 ######
 ######   Binaries and flags
@@ -36,7 +36,6 @@ LD = g++
 #LDFLAGS = -L/usr/local/lib/
 LDFLAGS = -pthread
 LDLIBS += -lrealsense2
-LDLIBS += -ldarknet
 LDLIBS += $(shell pkg-config --libs opencv)
 
 
