@@ -235,8 +235,6 @@ git pull
 
 %build
 
-exit
-
 cd opencv
 # enabled by default if libraries are presents at build time:
 # GTK, GSTREAMER, 1394, V4L, eigen3
