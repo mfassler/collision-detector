@@ -60,8 +60,21 @@ void worker_thread(CDNeuralNet _cdNet) {
 	}
 }
 
+// Command-line options:
+std::string keys =
+	"{ help   h | | Print help message. }"
+	"{ serial   | | choose specific RealSense by serial number}";
 
 int main(int argc, char* argv[]) {
+
+	cv::CommandLineParser parser(argc, argv, keys);
+
+	if (parser.has("help")) {
+		parser.printMessage();
+		return 0;
+	}
+
+	const std::string serialNumber = parser.get<cv::String>("serial");
 
 	struct timeval tv;
 	int _DEPTH_WIDTH = 848;
@@ -112,6 +125,10 @@ int main(int argc, char* argv[]) {
 	rs2::pipeline pipe;
 	rs2::config cfg;
 
+	if (serialNumber.length() > 1) {
+		printf("Trying to open RealSense serial#: %s\n", serialNumber.c_str());
+		cfg.enable_device(serialNumber);
+	}
 	cfg.enable_stream(RS2_STREAM_COLOR, _RGB_WIDTH, _RGB_HEIGHT, RS2_FORMAT_BGR8, _FPS);
 	cfg.enable_stream(RS2_STREAM_DEPTH, _DEPTH_WIDTH, _DEPTH_HEIGHT, RS2_FORMAT_Z16, _FPS);
 
