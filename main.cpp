@@ -113,8 +113,8 @@ int main(int argc, char* argv[]) {
 
 	// TODO:
 	// if (config_file) {
-	//    load_config_file();
-	//    change_width_height_and_fps_settings();
+	//   load_config_file();
+	//   change_width_height_and_fps_settings();
 	// }
 
 
@@ -132,8 +132,20 @@ int main(int argc, char* argv[]) {
 	cfg.enable_stream(RS2_STREAM_COLOR, _RGB_WIDTH, _RGB_HEIGHT, RS2_FORMAT_BGR8, _FPS);
 	cfg.enable_stream(RS2_STREAM_DEPTH, _DEPTH_WIDTH, _DEPTH_HEIGHT, RS2_FORMAT_Z16, _FPS);
 
-	printf("Starting the Intel RealSense driver...\n");
-	auto profile = pipe.start(cfg);
+	printf("Starting the RealSense pipeline...\n");
+	rs2::pipeline_profile profile;
+	try {
+		profile = pipe.start(cfg);
+	} catch (const rs2::error& e) {
+		printf("...pipeline failed:  %s\n", e.what());
+		printf("\n");
+		printf("  - perhaps wrong serial number?\n");
+		printf("  - perhaps the camera isn't being seen as a USB-3 device?\n");
+		printf("	   (RealSenses don't work too well as USB-2 devices)\n");
+		printf("\n");
+		exit(1);
+	}
+
 	printf("...started.  (I hope.)\n");
 
 	auto depth_sensor = profile.get_device().first<rs2::depth_sensor>();
