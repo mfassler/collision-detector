@@ -249,28 +249,12 @@ int main(int argc, char* argv[]) {
 
 		for (int i=0; i<nboxes_a; ++i) {
 
-			float x_center = bboxes_a[i].x * _RGB_WIDTH;
-			float y_center = bboxes_a[i].y * _RGB_HEIGHT;
-			float width = bboxes_a[i].w * _RGB_WIDTH;
-			float height = bboxes_a[i].h * _RGB_HEIGHT;
-
-			int x_min = (int) (x_center - bboxes_a[i].w * half_w);
-			int x_max = (int) (x_min + width);
-			int y_min = (int) (y_center - bboxes_a[i].h * half_h);
-			int y_max = (int) (y_min + height);
-
-			if (x_min < 0) {
-				x_min = 0;
-			}
-			if (x_max >= _RGB_WIDTH) {
-				x_max = _RGB_WIDTH - 1;
-			}
-			if (y_min < 0) {
-				y_min = 0;
-			}
-			if (y_max >= _RGB_HEIGHT) {
-				y_max = _RGB_HEIGHT - 1;
-			}
+			int x_min = bboxes_a[i].x;
+			int y_min = bboxes_a[i].y;
+			int width = bboxes_a[i].w;
+			int height = bboxes_a[i].h;
+			int x_max = x_min + width;
+			int y_max = y_min + height;
 
 			// Find the closest point within this box:
 			bbox_x_min = 20000;

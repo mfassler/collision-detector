@@ -11,9 +11,13 @@ std::mutex mtx_a;
 
 int bboxIdx = 0;
 int nboxes[2];
-struct _bbox bboxes[2][25];
+
+std::vector<int> classIds[2];
+std::vector<float> confidences[2];
+std::vector<cv::Rect> bboxes[2];
 
 std::vector<cv::String> _outNames;
+
 
 CDNeuralNet::CDNeuralNet(std::string modelPath, std::string configPath) {
 
@@ -76,6 +80,12 @@ void CDNeuralNet::detect(cv::Mat frame) {
 		}
 		int count = 0;
 
+		classIds[bboxIdx].clear();
+		confidences[bboxIdx].clear();
+		bboxes[bboxIdx].clear();
+
+		float confThreshold = 0.4;
+
 		for (size_t i=0; i<outs.size(); ++i) {
 			float* data = (float*)outs[i].data;
 			for (int j = 0; j < outs[i].rows; ++j, data += outs[i].cols) {
@@ -83,20 +93,36 @@ void CDNeuralNet::detect(cv::Mat frame) {
 				cv::Point classIdPoint;
 				double confidence;
 				minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
-				if (confidence > 0.2) {
-					int classId = classIdPoint.x;
-					//printf(" class: %d, conf: %0.2f\n", classId, confidence);
-					bboxes[bboxIdx][count].classId = classId;
-					bboxes[bboxIdx][count].confidence = confidence;
-					bboxes[bboxIdx][count].x = data[0];
-					bboxes[bboxIdx][count].y = data[1];
-					bboxes[bboxIdx][count].w = data[2];
-					bboxes[bboxIdx][count].h = data[3];
+
+				int classId = classIdPoint.x;
+				if (confidence > confThreshold && classId==0) {
+
+					classIds[bboxIdx].push_back(classId);
+					confidences[bboxIdx].push_back(confidence);
+
+					int centerX = (int)(data[0] * frame.cols);
+					int centerY = (int)(data[1] * frame.rows);
+					int width = (int)(data[2] * frame.cols);
+					int height = (int)(data[3] * frame.rows);
+					int left = centerX - width / 2;
+					int top = centerY - height / 2;
+
+					bboxes[bboxIdx].push_back(cv::Rect(left, top, width, height));
 					count++;
 				}
 			}
 		}
-		nboxes[bboxIdx] = count;
+
+		float nmsThreshold = 0.45;
+
+		std::vector<int> indices;
+		cv::dnn::NMSBoxes(bboxes[bboxIdx], confidences[bboxIdx], confThreshold, nmsThreshold, indices);
+
+		nboxes[bboxIdx] = indices.size();
+
+		//if (indices.size() != count) {
+		//	printf("nms.  old: %d, new: %d\n", count, indices.size());
+		//}
 
 		mtx_a.unlock();
 	}
@@ -112,15 +138,14 @@ ssize_t CDNeuralNet::get_output_boxes(struct _bbox *buf, size_t len) {
 		if (count > len) {
 			break;
 		}
-		if (bboxes[bboxIdx][i].confidence > 0.4 && bboxes[bboxIdx][i].classId == 0) {
-			buf[count].classId = bboxes[bboxIdx][i].classId;
-			buf[count].confidence = bboxes[bboxIdx][i].confidence;
-			buf[count].x = bboxes[bboxIdx][i].x;
-			buf[count].y = bboxes[bboxIdx][i].y;
-			buf[count].w = bboxes[bboxIdx][i].w;
-			buf[count].h = bboxes[bboxIdx][i].h;
-			count++;
-		}
+
+		buf[count].classId = classIds[bboxIdx][i];
+		buf[count].confidence = confidences[bboxIdx][i];
+		buf[count].x = bboxes[bboxIdx][i].x;
+		buf[count].y = bboxes[bboxIdx][i].y;
+		buf[count].w = bboxes[bboxIdx][i].width;
+		buf[count].h = bboxes[bboxIdx][i].height;
+		count++;
 	}
 	mtx_a.unlock();
 

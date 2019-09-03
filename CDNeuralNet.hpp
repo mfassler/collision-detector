@@ -8,7 +8,7 @@
 struct _bbox {
     int classId;
     float confidence;
-    float x, y, w, h;
+    int x, y, w, h;
 };
 
 
